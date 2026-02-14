@@ -5,7 +5,7 @@ from django.conf import settings
 
 BANNED = [
     r"\bdiagnos", r"\bprescrib", r"\bantibiotic", r"\bsteroid", r"\binhaler",
-    r"\bлечени", r"\bназнач", r:contentReference[oaicite:38]{index=38} :contentReference[oaicite:39]{index=39}heck(text: str) -> str:
+    r"\bлечени", r"\bназнач",
     t = text.strip()
     for pat in BANNED:
         if re.search(pat, t, re.IGNORECASE):
@@ -31,7 +31,7 @@ class LLMClient:
         )
 
     def generate_recommendation(self, payload: dict, mode: str = "today") -> str:
-        # Strict JSON in, template out (doc) :contentReference[oaicite:40]{index=40}
+        # Strict JSON in, template out (doc)
         lang = payload.get("language", "ru")
 
         system = (
@@ -39,7 +39,7 @@ class LLMClient:
             "1) NO medical diagnosis, NO drugs, NO treatment instructions.\n"
             "2) Do NOT invent measurements. Use ONLY fields in the JSON.\n"
             "3) Output must be short, practical, and template-based.\n"
-            "4) Include :contentReference[oaicite:41]{index=41}
+            "4) Include
             "5) Language must be exactly the requested language.\n"
         )
 

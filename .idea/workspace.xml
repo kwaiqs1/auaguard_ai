@@ -5,34 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c777d7d4-dec6-48ba-9a3a-50cdb6a2ef87" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.env" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/auaguard_ai.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/accounts/forms.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/accounts/signals.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/accounts/urls.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/aq/services/openaq_client.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/aq/services/openweather_client.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/aq/services/risk_engine.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/aq/urls_api.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/aq/views_api.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/core/context_processors.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/llm/client.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/accounts/login.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/accounts/profile.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/accounts/signup.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/base.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/core/about.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/core/dashboard.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/core/map.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/core/outlook.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/core/school.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/static/app.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/llm/client.py" beforeDir="false" afterPath="$PROJECT_DIR$/llm/client.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/core/about.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/core/about.html" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -50,6 +25,18 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {
+    "state": "OPEN",
+    "assignee": "kwaiqs1"
+  }
+}]]></component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "git@github.com:kwaiqs1/auaguard_ai.git",
+    "accountId": "0712478e-e952-4b9e-a084-aa16fd0b293f"
+  }
+}]]></component>
   <component name="ProjectColorInfo"><![CDATA[{
   "associatedIndex": 8
 }]]></component>
@@ -70,7 +57,7 @@
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "git-widget-placeholder": "master"
+    "git-widget-placeholder": "main"
   }
 }]]></component>
   <component name="SharedIndexes">
