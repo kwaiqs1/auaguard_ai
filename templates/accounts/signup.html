@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-xl mx-auto rounded-3xl glass p-6">
+  <h2 class="text-2xl font-semibold">{% if LANG_CODE== "kk" %}Тіркелу{% else %}Регистрация{% endif %}</h2>
+  <p class="mt-2 text-sm text-slate-300">
+    {% if LANG_CODE== "kk" %}Профиль деректері ұсыныстарды жекелеу үшін қажет.{% else %}Данные профиля нужны для персональных рекомендаций.{% endif %}
+  </p>
+
+  <form method="post" class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="{% if field.name in 'username email password1 password2' %}md:col-span-1{% endif %}">
+        <label class="text-xs text-slate-300">{{ field.label }}</label>
+        <div class="mt-1">{{ field }}</div>
+      </div>
+    {% endfor %}
+
+    <style>
+      input,select{ width:100%; padding:.8rem 1rem; border-radius:1rem; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.10); }
+      input[type=checkbox]{ width:auto; }
+    </style>
+
+    <div class="md:col-span-2">
+      <button class="w-full rounded-2xl bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-5 py-3 font-semibold">
+        {% if LANG_CODE=="kk" %}Аккаунт жасау{% else %}Создать аккаунт{% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

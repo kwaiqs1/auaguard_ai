@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-md mx-auto rounded-3xl glass p-6">
+  <h2 class="text-2xl font-semibold">{% if LANG_CODE== "kk" %}Кіру{% else %}Вход{% endif %}</h2>
+  <form method="post" class="mt-5 space-y-3">
+    {% csrf_token %}
+    {% for field in form %}
+      <div>
+        <label class="text-xs text-slate-300">{{ field.label }}</label>
+        <div class="mt-1">{{ field }}</div>
+        <style>
+          input{ width:100%; padding:.8rem 1rem; border-radius:1rem; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.10); }
+        </style>
+      </div>
+    {% endfor %}
+    <button class="w-full rounded-2xl bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-5 py-3 font-semibold">
+      {% if LANG_CODE=="kk" %}Кіру{% else %}Войти{% endif %}
+    </button>
+  </form>
+</div>
+{% endblock %}

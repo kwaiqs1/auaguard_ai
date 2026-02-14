@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="rounded-3xl glass p-6">
+  <div class="flex items-end justify-between gap-4">
+    <div>
+      <h2 class="text-2xl font-semibold">Outlook 0–72h</h2>
+      <div class="text-sm text-slate-300">{% if LANG_CODE=="kk" %}Тәуекел болжамы{% else %}Risk forecast table{% endif %}</div>
+    </div>
+    <button onclick="load()" class="rounded-2xl bg-white/5 border border-white/10 px-5 py-3 hover:bg-white/10">
+      {% if LANG_CODE=="kk" %}Жаңарту{% else %}Update{% endif %}
+    </button>
+  </div>
+
+  <div class="mt-6">
+    <canvas id="c" height="90"></canvas>
+  </div>
+
+  <div class="mt-6 overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="text-slate-300">
+        <tr class="border-b border-white/10">
+          <th class="text-left py-2 pr-3">Time</th>
+          <th class="text-left py-2 pr-3">PM2.5</th>
+          <th class="text-left py-2 pr-3">AQI</th>
+          <th class="text-left py-2 pr-3">Category</th>
+          <th class="text-left py-2 pr-3">Risk</th>
+          <th class="text-left py-2 pr-3">Conf</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+let chart;
+async function load(){
+  const r = await fetch(`/api/v1/aq/outlook?city=almaty&hours=72`);
+  const data = await r.json();
+  const rows = document.getElementById("rows");
+  rows.innerHTML = "";
+
+  const labels = [];
+  const risks = [];
+
+  data.results.forEach(x => {
+    labels.push(x.t.slice(11,16));
+    risks.push(x.risk);
+
+    const tr = document.createElement("tr");
+    tr.className = "border-b border-white/5";
+    tr.innerHTML = `
+      <td class="py-2 pr-3 text-slate-200">${x.t}</td>
+      <td class="py-2 pr-3">${x.pm25}</td>
+      <td class="py-2 pr-3">${x.aqi}</td>
+      <td class="py-2 pr-3 text-slate-300">${x.category}</td>
+      <td class="py-2 pr-3 font-semibold">${x.risk}</td>
+      <td class="py-2 pr-3 text-slate-300">${Math.round(x.confidence*100)}%</td>
+    `;
+    rows.appendChild(tr);
+  });
+
+  const ctx = document.getElementById("c").getContext("2d");
+  if(chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type:"line",
+    data:{ labels, datasets:[{label:"Risk (0–100)", data: risks, tension:.35}]},
+    options:{ plugins:{ legend:{ labels:{ color:"#e2e8f0"}}}}
+  });
+}
+load();
+</script>
+{% endblock %}

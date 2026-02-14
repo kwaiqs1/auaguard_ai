@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-3xl rounded-3xl glass p-6">
+  <h2 class="text-2xl font-semibold">{% if LANG_CODE=="kk" %}Жоба туралы{% else %}About{% endif %}</h2>
+  <div class="mt-3 text-slate-200 leading-relaxed">
+    <p>
+      {% if LANG_CODE=="kk" %}
+        AuaGuard AI — смог тәуекелін түсіндірілетін алгоритмдер арқылы есептейді: PM2.5 + ауа райы + тренд + маусымдық фактор.
+      {% else %}
+        AuaGuard AI вычисляет объяснимый Smog Risk Index: PM2.5 + застой воздуха + тренд + сезонность,
+        и показывает confidence, чтобы пользователь видел надёжность.
+      {% endif %}
+    </p>
+
+    <p class="mt-3 text-slate-300 text-sm">
+      Док-принципы: детерминированный AQI, формула Risk Index, guardrails для LLM, прозрачность источников и времени обновления.
+      :contentReference[oaicite:42]{index=42} :contentReference[oaicite:43]{index=43}
+    </p>
+  </div>
+</div>
+{% endblock %}

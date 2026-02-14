@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="rounded-3xl glass p-8">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-2xl font-semibold">School Mode</h2>
+      <div class="text-sm text-slate-300">
+        {% if LANG_CODE=="kk" %}Ертең таңертең (6–8) даладағы дене шынықтыруға бола ма?{% else %}Можно ли проводить физру на улице завтра утром (6–8)?{% endif %}
+      </div>
+    </div>
+    <button onclick="load()" class="rounded-2xl bg-white/5 border border-white/10 px-5 py-3 hover:bg-white/10">
+      {% if LANG_CODE=="kk" %}Жаңарту{% else %}Update{% endif %}
+    </button>
+  </div>
+
+  <div class="mt-8 rounded-3xl bg-gradient-to-r from-indigo-500/25 to-fuchsia-500/20 border border-white/10 p-8">
+    <div id="decision" class="text-5xl font-bold tracking-tight">—</div>
+    <div id="text" class="mt-4 text-base text-slate-100/90 whitespace-pre-line">—</div>
+  </div>
+</div>
+
+<script>
+async function load(){
+  const r = await fetch(`/api/v1/school/decision?city=almaty`);
+  const data = await r.json();
+  document.getElementById("decision").textContent = data.decision || "—";
+  document.getElementById("text").textContent = data.text || "—";
+}
+load();
+</script>
+{% endblock %}

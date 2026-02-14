@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <div class="lg:col-span-2 rounded-3xl glass p-4">
+    <div class="flex items-center justify-between px-2 py-2">
+      <div class="font-semibold">{% if LANG_CODE=="kk" %}Карта{% else %}Map{% endif %}</div>
+      <div class="flex gap-2">
+        <input id="q" placeholder="{% if LANG_CODE=='kk' %}Адрес енгізу{% else %}Enter address{% endif %}"
+               class="rounded-2xl bg-white/5 border border-white/10 px-4 py-2 w-72"/>
+        <button onclick="search()"
+                class="rounded-2xl bg-white/5 border border-white/10 px-4 py-2 hover:bg-white/10">
+          {% if LANG_CODE=="kk" %}Іздеу{% else %}Search{% endif %}
+        </button>
+      </div>
+    </div>
+    <div id="map" class="h-[520px] rounded-2xl overflow-hidden"></div>
+  </div>
+
+  <div class="rounded-3xl glass p-6">
+    <div class="text-sm text-slate-300">{% if LANG_CODE=="kk" %}Таңдалған нүкте{% else %}Selected point{% endif %}</div>
+    <div id="meta" class="mt-2 text-sm">—</div>
+
+    <div class="mt-4 grid grid-cols-2 gap-3">
+      <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+        <div class="text-xs text-slate-300">PM2.5</div>
+        <div class="mt-1 text-xl font-semibold"><span id="pm">—</span> <span class="text-xs text-slate-300">µg/m³</span></div>
+      </div>
+      <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+        <div class="text-xs text-slate-300">AQI</div>
+        <div class="mt-1 text-xl font-semibold" id="aqi">—</div>
+      </div>
+      <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+        <div class="text-xs text-slate-300">{% if LANG_CODE=="kk" %}Тәуекел{% else %}Risk{% endif %}</div>
+        <div class="mt-1 text-xl font-semibold" id="risk">—</div>
+      </div>
+      <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+        <div class="text-xs text-slate-300">Confidence</div>
+        <div class="mt-1 text-xl font-semibold"><span id="conf">—</span>%</div>
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <canvas id="chart" height="140"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+let map, marker, chart, stationDots = [];
+
+function init(){
+  map = L.map('map').setView([43.238949, 76.889709], 11);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+  map.on('click', async (e) => {
+    await pick(e.latlng.lat, e.latlng.lng);
+  });
+}
+init();
+
+async function pick(lat, lon){
+  if(marker) marker.remove();
+  marker = L.marker([lat, lon]).addTo(map);
+
+  // station dots near
+  stationDots.forEach(d => d.remove());
+  stationDots = [];
+  const s = await fetch(`/api/v1/stations/near?lat=${lat}&lon=${lon}`);
+  const ss = await s.json();
+  ss.results.forEach(p => {
+    if(p.lat && p.lon){
+      stationDots.push(L.circleMarker([p.lat, p.lon], {radius:6}).addTo(map).bindPopup(p.name));
+    }
+  });
+
+  const r = await fetch(`/api/v1/aq/current?lat=${lat}&lon=${lon}&city=almaty`);
+  const data = await r.json();
+  document.getElementById("meta").textContent = `${data.district || "Nearest station"} · ${data.timestamp_local}`;
+  document.getElementById("pm").textContent = data.pm25_ug_m3 ?? "—";
+  document.getElementById("aqi").textContent = data.aqi ?? "—";
+  document.getElementById("risk").textContent = data.risk_score ?? "—";
+  document.getElementById("conf").textContent = Math.round((data.confidence ?? 0)*100);
+
+  if(data.sensor_id){
+    const rr = await fetch(`/api/v1/aq/series24h?sensor_id=${data.sensor_id}`);
+    const series = await rr.json();
+    render(series.labels, series.values);
+  }else{
+    render([], []);
+  }
+}
+
+function render(labels, values){
+  const ctx = document.getElementById("chart").getContext("2d");
+  if(chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: "line",
+    data: { labels, datasets: [{ label: "PM2.5 (µg/m³)", data: values, tension: 0.35 }] },
+    options: { plugins: { legend: { labels: { color: "#e2e8f0" } } } }
+  });
+}
+
+async function search(){
+  const q = document.getElementById("q").value.trim();
+  if(!q) return;
+  const r = await fetch(`/api/v1/geocode?q=${encodeURIComponent(q)}`);
+  const data = await r.json();
+  if(data.results.length){
+    const p = data.results[0];
+    map.setView([p.lat, p.lon], 13);
+    await pick(p.lat, p.lon);
+  }
+}
+</script>
+
+{% endblock %}

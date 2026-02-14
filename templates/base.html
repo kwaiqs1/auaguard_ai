@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="{{ LANG_CODE }}">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>{{ APP_NAME }}</title>
+
+  <!-- Tailwind CDN (без сборки) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Alpine (микро-анимации/меню) -->
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <link rel="stylesheet" href="/static/app.css"/>
+</head>
+
+<body class="min-h-screen bg-slate-950 text-slate-100">
+  <!-- Topbar -->
+  <header class="sticky top-0 z-40 border-b border-white/10 bg-slate-950/70 backdrop-blur">
+    <div class="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 shadow-lg shadow-fuchsia-500/20"></div>
+        <div>
+          <div class="font-semibold tracking-tight">{{ APP_NAME }}</div>
+          <div class="text-xs text-slate-300">
+            {% if LANG_CODE == "kk" %}{{ APP_TAGLINE_KK }}{% else %}{{ APP_TAGLINE_RU }}{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <nav class="hidden md:flex items-center gap-1 text-sm">
+        <a class="navlink" href="/">{% if LANG_CODE == "kk" %}Басты бет{% else %}Начало{% endif %}</a>
+        <a class="navlink" href="/map/">{% if LANG_CODE == "kk" %}Карта{% else %}Map{% endif %}</a>
+        <a class="navlink" href="/outlook/">{% if LANG_CODE == "kk" %}Болжам{% else %}Outlook{% endif %}</a>
+        <a class="navlink" href="/school/">{% if LANG_CODE == "kk" %}Мектеп режимі{% else %}School Mode{% endif %}</a>
+        <a class="navlink" href="/about/">{% if LANG_CODE == "kk" %}Жоба{% else %}About{% endif %}</a>
+      </nav>
+
+      <div class="flex items-center gap-2">
+        <form method="post" action="{% url 'set_language' %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.path }}">
+          <select name="language" onchange="this.form.submit()"
+                  class="rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm">
+            <option value="ru" {% if LANG_CODE == "ru" %}selected{% endif %}>Русский</option>
+            <option value="kk" {% if LANG_CODE == "kk" %}selected{% endif %}>Қазақша</option>
+          </select>
+        </form>
+
+        {% if user.is_authenticated %}
+          <a href="/auth/logout/" class="rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm hover:bg-white/10">
+            {% if LANG_CODE == "kk" %}Шығу{% else %}Выйти{% endif %}
+          </a>
+          <a href="/auth/profile/" class="rounded-xl bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-3 py-2 text-sm font-semibold shadow-lg shadow-fuchsia-500/20">
+            {% if LANG_CODE == "kk" %}Профиль{% else %}Profile{% endif %}
+          </a>
+        {% else %}
+          <a href="/auth/login/" class="rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm hover:bg-white/10">
+            {% if LANG_CODE == "kk" %}Кіру{% else %}Вход{% endif %}
+          </a>
+          <a href="/auth/signup/" class="rounded-xl bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-3 py-2 text-sm font-semibold shadow-lg shadow-fuchsia-500/20">
+            {% if LANG_CODE == "kk" %}Тіркелу{% else %}Регистрация{% endif %}
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <!-- Content -->
+  <main class="mx-auto max-w-7xl px-4 py-8">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="mx-auto max-w-7xl px-4 pb-10 text-xs text-slate-400">
+    <div class="border-t border-white/10 pt-6">
+      {% if LANG_CODE == "kk" %}
+        Дереккөздер: OpenAQ + OpenWeather. Бұл медициналық кеңес емес.
+      {% else %}
+        Источники: OpenAQ + OpenWeather. Это не медицинская рекомендация.
+      {% endif %}
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,14 @@
+.navlink{
+  padding: .55rem .8rem;
+  border-radius: .9rem;
+  color: rgba(226,232,240,.92);
+  border: 1px solid rgba(255,255,255,.06);
+  background: rgba(255,255,255,.02);
+}
+.navlink:hover{ background: rgba(255,255,255,.07); }
+
+.glass{
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow: 0 20px 60px rgba(0,0,0,.35);
+}
