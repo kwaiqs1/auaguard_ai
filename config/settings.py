@@ -17,6 +17,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
+    # ✅ реальные apps из твоего проекта
     "core",
     "accounts",
     "aq",
@@ -90,7 +91,7 @@ LOGIN_URL = "/auth/login/"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
 
-# External API settings
+# --- External APIs ---
 OPENAQ_BASE_URL = os.getenv("OPENAQ_BASE_URL", "https://api.openaq.org")
 OPENAQ_API_KEY = os.getenv("OPENAQ_API_KEY", "")
 
@@ -98,7 +99,9 @@ OPENWEATHER_BASE_URL = os.getenv("OPENWEATHER_BASE_URL", "https://api.openweathe
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
 
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://openrouter.ai/api/v1")
-LLM_API_KEY = os.getenv("LLM_API_KEY", "")
+# ✅ ключ берём либо из LLM_API_KEY, либо из OPENROUTER_API_KEY
+LLM_API_KEY = os.getenv("LLM_API_KEY", "") or os.getenv("OPENROUTER_API_KEY", "")
 LLM_MODEL = os.getenv("LLM_MODEL", "deepseek/deepseek-r1-0528:free")
+
 OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", "")
 OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "AuaGuardAI")

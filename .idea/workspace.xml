@@ -5,9 +5,20 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c777d7d4-dec6-48ba-9a3a-50cdb6a2ef87" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.env" beforeDir="false" afterPath="$PROJECT_DIR$/.env" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aq/services/openaq_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/aq/services/openaq_client.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aq/services/risk_engine.py" beforeDir="false" afterPath="$PROJECT_DIR$/aq/services/risk_engine.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/aq/views_api.py" beforeDir="false" afterPath="$PROJECT_DIR$/aq/views_api.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/llm/client.py" beforeDir="false" afterPath="$PROJECT_DIR$/llm/client.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/accounts/login.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/accounts/login.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/accounts/profile.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/accounts/profile.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/accounts/signup.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/accounts/signup.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/base.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/base.html" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/templates/core/about.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/core/about.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/core/map.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/core/map.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/core/outlook.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/core/outlook.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/core/school.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/core/school.html" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -76,16 +87,5 @@
       <updated>1771082284439</updated>
     </task>
     <servers />
-  </component>
-  <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/llm/client.py</url>
-          <line>9</line>
-          <option name="timeStamp" value="1" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
   </component>
 </project>

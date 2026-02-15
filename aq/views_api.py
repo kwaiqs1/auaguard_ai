@@ -1,11 +1,13 @@
+from datetime import datetime, timedelta
+
+import requests
 from django.conf import settings
+from django.core.cache import cache
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
-from datetime import datetime, timedelta
-import requests
 
-from .services.openaq_client import OpenAQClient, pick_pm25_sensor_from_latest
+from .services.openaq_client import OpenAQClient, OpenAQError, PM25_PARAMETER_ID
 from .services.openweather_client import OpenWeatherClient
 from .services.risk_engine import compute_all
 
@@ -14,8 +16,9 @@ CITIES = {
     "astana": {"display": "Astana", "lat": 51.169392, "lon": 71.449074},
 }
 
-openaq = OpenAQClient(settings.OPENAQ_BASE_URL, settings.OPENAQ_API_KEY)
-ow = OpenWeatherClient(settings.OPENWEATHER_BASE_URL, settings.OPENWEATHER_API_KEY) if getattr(settings, "OPENWEATHER_API_KEY", None) else None
+# Global clients (cheap; requests.Session reuse)
+openaq = OpenAQClient(getattr(settings, "OPENAQ_BASE_URL", "https://api.openaq.org"), getattr(settings, "OPENAQ_API_KEY", ""))
+ow = OpenWeatherClient(settings.OPENWEATHER_BASE_URL, settings.OPENWEATHER_API_KEY) if getattr(settings, "OPENWEATHER_API_KEY", "") else None
 
 
 def _user_profile_payload(request):
@@ -32,111 +35,189 @@ def _user_profile_payload(request):
     return {"sensitivity": "normal", "age_group": "adult", "activity": "commute", "language": "ru"}
 
 
-def _current_snapshot(city: str, lat: float | None = None, lon: float | None = None):
+def _parse_iso(dt_str: str):
+    if not dt_str:
+        return None
+    s = dt_str.strip()
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    try:
+        return datetime.fromisoformat(s)
+    except Exception:
+        return None
+
+
+def _extract_hour_point(row: dict):
+    """
+    OpenAQ /measurements/hourly returns rows with:
+      - value
+      - period.datetimeFrom.{utc, local}
+      - coverage.percentCoverage
+    We normalize it into (dt_str, value, coverage_ratio_0_1).
+    """
+    val = row.get("value")
+    if val is None:
+        return None
+
+    period = row.get("period") or {}
+    dt_from = period.get("datetimeFrom") or {}
+    dt_str = dt_from.get("local") or dt_from.get("utc") or ""
+
+    cov = row.get("coverage") or {}
+    pct = cov.get("percentCoverage")
+    cov_ratio = None
+    if pct is not None:
+        try:
+            cov_ratio = float(pct) / 100.0
+        except Exception:
+            cov_ratio = None
+
+    return dt_str, float(val), cov_ratio
+
+
+def _current_snapshot(city: str, *, lat: float = None, lon: float = None):
+    """
+    Return (data, error). If OpenAQ fails but cached data exists, return cached data (stale=True).
+    """
     city = (city or "almaty").lower()
+    meta = CITIES.get(city, CITIES["almaty"])
 
-    if lat is not None and lon is not None:
-        city_display = "Selected point"
-        _lat, _lon = float(lat), float(lon)
-    else:
-        c = CITIES.get(city, CITIES["almaty"])
-        city_display = c["display"]
-        _lat, _lon = c["lat"], c["lon"]
+    use_lat = float(lat) if lat is not None else float(meta["lat"])
+    use_lon = float(lon) if lon is not None else float(meta["lon"])
 
-    # 1) nearest locations
-    locations = openaq.locations_near(_lat, _lon, radius_m=12000, limit=10)
-    if not locations:
-        return None, {"error": "No OpenAQ locations nearby"}
+    cache_key = f"aq:current:{city}:{round(use_lat,4)}:{round(use_lon,4)}"
 
-    best_loc = locations[0]
-    location_id = int(best_loc.get("id"))
-    # location label
-    loc_name = best_loc.get("name") or ""
-
-    # 2) latest by location
-    latest = openaq.location_latest(location_id)
-    picked = pick_pm25_sensor_from_latest(latest)
-    if not picked:
-        return None, {"error": "No PM2.5 latest data for nearest location"}
-
-    pm25_value, unit, sensor_id, dt_utc, picked_loc_name = picked
-    if picked_loc_name:
-        loc_name = picked_loc_name
-
-    # 3) weather context
-    weather = {"wind_m_s": None, "pressure_hpa": None, "temp_c": None}
-    forecast_stability = 0.65
-    if ow:
-        w = ow.onecall(_lat, _lon)
-        curw = (w or {}).get("current", {}) if isinstance(w, dict) else {}
-        weather = {
-            "wind_m_s": curw.get("wind_speed"),
-            "pressure_hpa": curw.get("pressure"),
-            "temp_c": curw.get("temp"),
-        }
-        ws = curw.get("wind_speed") or 0
-        forecast_stability = 0.85 if ws < 6 else 0.65
-
-    # 4) last 24h series for trend+coverage
-    series = []
-    coverage_ratio = 0.3
     try:
-        hourly = openaq.sensor_hourly(int(sensor_id), hours=24) if sensor_id else []
-        series = [float(x.get("value")) for x in hourly if x.get("value") is not None]
-        coverage_ratio = min(1.0, len(series) / 24.0)
-    except Exception:
-        series = []
-        coverage_ratio = 0.0
+        snap = openaq.pm25_latest_near(use_lat, use_lon, radius_m=9000, limit_locations=25)
 
-    # 5) data age (minutes) + local timestamp
-    age_min = 180.0
-    ts_local = timezone.localtime().strftime("%Y-%m-%d %H:%M")
-    try:
+        pm25 = float(snap["pm25_ug_m3"])
+        sensor_id = snap.get("sensor_id")
+
+        # Try to fetch 24h series for trend/confidence.
+        series_vals = [pm25]
+        coverage_ratio = 0.75
+        try:
+            hourly = openaq.sensor_hourly(int(sensor_id), hours=24) if sensor_id else []
+            pts = [_extract_hour_point(r) for r in (hourly or [])]
+            pts = [p for p in pts if p is not None]
+            if pts:
+                series_vals = [p[1] for p in pts]
+                covs = [p[2] for p in pts if p[2] is not None]
+                if covs:
+                    coverage_ratio = sum(covs) / len(covs)
+        except Exception:
+            # not fatal for snapshot
+            pass
+
+        # Weather (optional)
+        wind = None
+        pres = None
+        weather = {}
+        if ow:
+            try:
+                w = ow.onecall(use_lat, use_lon)
+                curw = (w.get("current") or {}) if isinstance(w, dict) else {}
+                wind = curw.get("wind_speed")
+                pres = curw.get("pressure")
+                weather = {
+                    "temp_c": curw.get("temp"),
+                    "wind_m_s": wind,
+                    "pressure_hpa": pres,
+                }
+            except Exception:
+                weather = {}
+
+        # Data age (minutes)
+        dt_utc = _parse_iso(snap.get("timestamp_utc") or "")
+        now_utc = timezone.now()
+        data_age_minutes = 60.0
+        ts_local = None
         if dt_utc:
-            parsed = datetime.fromisoformat(dt_utc.replace("Z", "+00:00"))
-            age_min = (timezone.now() - parsed).total_seconds() / 60.0
-            ts_local = timezone.localtime(parsed).strftime("%Y-%m-%d %H:%M")
-    except Exception:
-        pass
+            try:
+                data_age_minutes = max(0.0, (now_utc - dt_utc).total_seconds() / 60.0)
+                ts_local = timezone.localtime(dt_utc).strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                pass
 
-    out = compute_all(
-        pm25=float(pm25_value) if pm25_value is not None else 0.0,
-        wind=weather["wind_m_s"],
-        pressure=weather["pressure_hpa"],
-        pm_series=series[-12:] if len(series) >= 12 else series,
-        data_age_minutes=age_min,
-        coverage_ratio=coverage_ratio,
-        forecast_stability=forecast_stability,
-    )
+        out = compute_all(
+            pm25=pm25,
+            wind=wind,
+            pressure=pres,
+            pm_series=series_vals,
+            data_age_minutes=data_age_minutes,
+            coverage_ratio=coverage_ratio,
+            forecast_stability=0.7,
+        )
 
-    payload = {
-        "city": city,
-        "city_display": city_display,
-        "district": loc_name,
-        "pm25_ug_m3": round(float(pm25_value), 1) if pm25_value is not None else None,
-        "aqi": out.aqi,
-        "category": out.category,
-        "risk_score": out.risk_score,
-        "trend_label": out.trend_label,
-        "confidence": out.confidence,
-        "timestamp_local": ts_local,
-        "source": "OpenAQ" + (" + OpenWeather" if ow else ""),
-        "sensor_id": sensor_id,
-        "weather": weather,
-    }
-    return payload, None
+        data = {
+            "city": city,
+            "city_display": meta["display"],
+            "district": meta.get("district", ""),
+            "coords": {"lat": use_lat, "lon": use_lon},
+
+            "pm25_ug_m3": round(pm25, 1),
+            "unit": snap.get("unit") or "µg/m³",
+
+            "aqi": out.aqi,
+            "category": out.category,
+            "risk_score": out.risk_score,
+            "confidence": out.confidence,
+            "trend": out.trend_label,
+
+            "timestamp_utc": snap.get("timestamp_utc"),
+            "timestamp_local": ts_local,
+
+            "sensor_id": sensor_id,
+            "location_id": snap.get("location_id"),
+            "location_name": snap.get("location_name"),
+
+            "source": "OpenAQ v3",
+            "weather": weather,
+        }
+
+        cache.set(cache_key, data, 10 * 60)
+        return data, None
+
+    except Exception as e:
+        cached = cache.get(cache_key)
+        if cached:
+            cached = dict(cached)
+            cached["stale"] = True
+            cached["source"] = "OpenAQ (cached)"
+            cached["error"] = str(e)
+            return cached, None
+
+        hint = "Check OPENAQ_API_KEY (.env) and that you're using OpenAQ v3 endpoints."
+        if isinstance(e, OpenAQError) and "missing" in str(e).lower():
+            hint = "OPENAQ_API_KEY is missing. Add your OpenAQ v3 API key into .env as OPENAQ_API_KEY=..."
+        return None, {"error": "OpenAQ unavailable", "detail": str(e), "hint": hint}
 
 
 @require_GET
 def cities(request):
-    return JsonResponse({"results": [{"id": k, "name": v["display"]} for k, v in CITIES.items()]})
+    return JsonResponse({"results": [{"key": k, "display": v["display"]} for k, v in CITIES.items()]})
 
 
 @require_GET
 def stations_near(request):
-    lat = float(request.GET.get("lat"))
-    lon = float(request.GET.get("lon"))
-    locations = openaq.locations_near(lat, lon, radius_m=10000, limit=12)
+    lat = request.GET.get("lat")
+    lon = request.GET.get("lon")
+    if not lat or not lon:
+        return JsonResponse({"error": "lat and lon are required"}, status=400)
+
+    radius = int(request.GET.get("radius") or 9000)
+    limit = int(request.GET.get("limit") or 25)
+
+    try:
+        locations = openaq.locations_near(
+            lat=float(lat),
+            lon=float(lon),
+            radius_m=radius,
+            limit=limit,
+            parameters_id=PM25_PARAMETER_ID,  # only stations that have PM2.5
+        )
+    except Exception as e:
+        return JsonResponse({"error": "OpenAQ unavailable", "detail": str(e)}, status=502)
 
     out = []
     for loc in locations:
@@ -144,33 +225,11 @@ def stations_near(request):
         out.append({
             "id": loc.get("id"),
             "name": loc.get("name"),
-            "lat": coords.get("latitude"),
-            "lon": coords.get("longitude"),
+            "distance_m": loc.get("distance"),
+            "coords": {"lat": coords.get("latitude"), "lon": coords.get("longitude")},
         })
-    return JsonResponse({"results": out})
 
-
-@require_GET
-def aq_series24h(request):
-    sensor_id = int(request.GET.get("sensor_id"))
-    results = openaq.sensor_hourly(sensor_id, hours=24)
-
-    labels, values = [], []
-    for r in results:
-        dt_obj = r.get("datetimeFrom") or r.get("datetime") or {}
-        dt = None
-        if isinstance(dt_obj, dict):
-            dt = dt_obj.get("local") or dt_obj.get("utc")
-        if not dt and isinstance(r.get("date"), str):
-            dt = r.get("date")
-
-        if not dt or not isinstance(dt, str) or len(dt) < 16:
-            continue
-
-        labels.append(dt[11:16])  # HH:MM
-        values.append(float(r.get("value") or 0))
-
-    return JsonResponse({"labels": labels, "values": values})
+    return JsonResponse({"count": len(out), "results": out})
 
 
 @require_GET
@@ -180,13 +239,47 @@ def aq_current(request):
     lon = request.GET.get("lon")
 
     if lat and lon:
-        payload, err = _current_snapshot(city, float(lat), float(lon))
+        payload, err = _current_snapshot(city, lat=float(lat), lon=float(lon))
     else:
         payload, err = _current_snapshot(city)
 
     if err:
         return JsonResponse(err, status=502)
     return JsonResponse(payload)
+
+
+@require_GET
+def aq_series24h(request):
+    sensor_id = request.GET.get("sensor_id")
+    if not sensor_id:
+        return JsonResponse({"labels": [], "values": []})
+
+    try:
+        results = openaq.sensor_hourly(int(sensor_id), hours=24)
+    except Exception as e:
+        return JsonResponse({"error": "OpenAQ unavailable", "detail": str(e)}, status=502)
+
+    points = []
+    for r in (results or []):
+        p = _extract_hour_point(r)
+        if not p:
+            continue
+        dt_str, val, _cov = p
+        if not dt_str or len(dt_str) < 16:
+            continue
+        dt_obj = _parse_iso(dt_str)
+        points.append((dt_obj or dt_str, dt_str, val))
+
+    # sort by datetime
+    points.sort(key=lambda x: x[0])
+
+    labels, values = [], []
+    for _key, dt_str, val in points[-24:]:
+        # label HH:MM (local)
+        labels.append(dt_str[11:16])
+        values.append(float(val))
+
+    return JsonResponse({"labels": labels, "values": values})
 
 
 @require_GET
@@ -317,6 +410,7 @@ def school_decision(request):
     profile = _user_profile_payload(request)
     profile["activity"] = "outdoor_sport"
 
+    # Use internal outlook endpoint
     out = requests.get(f"http://127.0.0.1:8000/api/v1/aq/outlook?city={city}&hours=36", timeout=15).json()
     slots = out.get("results", [])
 
@@ -342,7 +436,7 @@ def school_decision(request):
         "profile": {
             "sensitivity": profile["sensitivity"],
             "age_group": profile["age_group"],
-            "activity": "outdoor_sport"
+            "activity": "outdoor_sport",
         },
         "language": profile.get("language", "ru"),
     }

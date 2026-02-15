@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="max-w-xl mx-auto rounded-3xl glass p-6">
-  <h2 class="text-2xl font-semibold">{% if LANG_CODE=="kk" %}Профиль{% else %}Profile{% endif %}</h2>
+  <h2 class="text-2xl font-semibold">{% if LANG_CODE == "kk" %}Профиль{% else %}Profile{% endif %}</h2>
   <form method="post" class="mt-5 space-y-3">
     {% csrf_token %}
     {% for field in form %}
@@ -15,7 +15,7 @@
       input[type=checkbox]{ width:auto; }
     </style>
     <button class="w-full rounded-2xl bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-5 py-3 font-semibold">
-      {% if LANG_CODE=="kk" %}Сақтау{% else %}Save{% endif %}
+      {% if LANG_CODE == "kk" %}Сақтау{% else %}Save{% endif %}
     </button>
   </form>
 </div>

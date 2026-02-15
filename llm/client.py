@@ -1,125 +1,144 @@
 import json
 import re
+from typing import Any, Dict, List, Optional
+
 import requests
 from django.conf import settings
 
-BANNED = [
-    r"\bdiagnos", r"\bprescrib", r"\bantibiotic", r"\bsteroid", r"\binhaler",
-    r"\bлечени", r"\bназнач",
-    t = text.strip()
-    for pat in BANNED:
-        if re.search(pat, t, re.IGNORECASE):
-            return "⚠️ Safe-mode: I can’t provide medical advice. Here are general exposure-reduction steps: reduce time outdoors, keep windows closed during peaks, choose indoor activities, and monitor updates."
-    return t
+
+class LLMError(RuntimeError):
+    pass
+
 
 class LLMClient:
-    def __init__(self, base_url: str, api_key: str, model: str, site_url: str = "", app_name: str = ""):
-        self.base_url = base_url.rstrip("/")
-        self.api_key = api_key.strip()
-        self.model = model
-        self.site_url = site_url
-        self.app_name = app_name
+    """
+    OpenRouter (OpenAI-compatible) client for generating short health recommendations.
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        model: str,
+        *,
+        site_url: str = "",
+        app_name: str = "AuaGuardAI",
+        timeout_s: int = 35,
+    ):
+        self.base_url = (base_url or "").rstrip("/") or "https://openrouter.ai/api/v1"
+        self.api_key = (api_key or "").strip()
+        self.model = (model or "").strip()
+        self.site_url = (site_url or "").strip()
+        self.app_name = (app_name or "").strip() or "AuaGuardAI"
+        self.timeout_s = int(timeout_s)
+
+        if not self.model:
+            raise LLMError("LLM_MODEL is missing.")
+        if not self.api_key:
+            raise LLMError("LLM_API_KEY is missing. Put your OpenRouter key into LLM_API_KEY or OPENROUTER_API_KEY in .env")
+
+        self.session = requests.Session()
 
     @classmethod
-    def from_settings(cls):
+    def from_settings(cls) -> "LLMClient":
         return cls(
-            base_url=settings.LLM_BASE_URL,
-            api_key=settings.LLM_API_KEY,
-            model=settings.LLM_MODEL,
+            base_url=getattr(settings, "LLM_BASE_URL", "https://openrouter.ai/api/v1"),
+            api_key=getattr(settings, "LLM_API_KEY", ""),
+            model=getattr(settings, "LLM_MODEL", "deepseek/deepseek-r1-0528:free"),
             site_url=getattr(settings, "OPENROUTER_SITE_URL", ""),
             app_name=getattr(settings, "OPENROUTER_APP_NAME", "AuaGuardAI"),
         )
 
-    def generate_recommendation(self, payload: dict, mode: str = "today") -> str:
-        # Strict JSON in, template out (doc)
-        lang = payload.get("language", "ru")
+    def _headers(self) -> Dict[str, str]:
+        h = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        # Optional but recommended by OpenRouter for analytics/rate limits attribution
+        if self.site_url:
+            h["HTTP-Referer"] = self.site_url
+        if self.app_name:
+            h["X-Title"] = self.app_name
+        return h
+
+    @staticmethod
+    def _clean(text: str) -> str:
+        t = (text or "").strip()
+        # remove excessive markdown noise if model returns it
+        t = re.sub(r"\n{3,}", "\n\n", t)
+        return t
+
+    def _chat(self, messages: List[Dict[str, str]], *, temperature: float = 0.4, max_tokens: int = 350) -> str:
+        url = f"{self.base_url}/chat/completions"
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": float(temperature),
+            "max_tokens": int(max_tokens),
+        }
+
+        try:
+            r = self.session.post(url, headers=self._headers(), json=payload, timeout=self.timeout_s)
+            r.raise_for_status()
+            data = r.json()
+        except Exception as e:
+            raise LLMError(f"OpenRouter request failed: {e}")
+
+        if isinstance(data, dict) and data.get("error"):
+            raise LLMError(str(data.get("error")))
+
+        try:
+            content = data["choices"][0]["message"]["content"]
+        except Exception:
+            raise LLMError(f"Unexpected OpenRouter response shape: {json.dumps(data)[:500]}")
+
+        content = self._clean(content)
+        if not content:
+            raise LLMError("Model returned empty content.")
+        return content
+
+    def generate_recommendation(self, payload: Dict[str, Any], *, mode: str = "today") -> str:
+        lang = (payload.get("language") or "ru").lower()
+        if lang.startswith("en"):
+            out_lang = "English"
+        else:
+            out_lang = "Russian"
 
         system = (
-            "You are AuaGuard AI. You MUST follow these rules:\n"
-            "1) NO medical diagnosis, NO drugs, NO treatment instructions.\n"
-            "2) Do NOT invent measurements. Use ONLY fields in the JSON.\n"
-            "3) Output must be short, practical, and template-based.\n"
-            "4) Include
-            "5) Language must be exactly the requested language.\n"
+            "You are AuaGuard AI — a health-first air quality assistant. "
+            "You provide practical, safe, non-alarmist recommendations for outdoor activity and exposure reduction. "
+            "You never invent measurements; you rely only on the provided payload. "
+            f"Write your answer in {out_lang}."
         )
 
         if mode == "school":
-            template_ru = (
-                "School Mode card.\n"
-                "Return 4 bullet lines:\n"
-                "• Decision: Outdoor OK / Caution / Indoors\n"
-                "• Why: 1 sentence with PM2.5 + wind/pressure + trend\n"
-                "• Action: 1 sentence (what school should do)\n"
-                "• Confidence: (0.xx) + sources\n"
-            )
-            template_kk = (
-                "Мектеп режимі.\n"
-                "4 жол:\n"
-                "• Шешім: Outdoor OK / Caution / Indoors\n"
-                "• Неге: PM2.5 + жел/қысым + тренд\n"
-                "• Әрекет: мектепке ұсыныс\n"
-                "• Сенім: (0.xx) + дереккөз\n"
+            instructions = (
+                "Task: advise whether a morning outdoor activity (school PE/outdoor break) is OK.\n"
+                "Output format:\n"
+                "1) Decision: Outdoor OK / Caution / Indoors\n"
+                "2) 2–4 short bullet recommendations (mask/route/time/ventilation)\n"
+                "3) One-line explanation referencing PM2.5/AQI and the user sensitivity.\n"
+                "Keep it short (max ~120 words)."
             )
         else:
-            template_ru = (
-                "Today decision card.\n"
-                "Return 4 bullet lines:\n"
-                "• Decision: short\n"
-                "• Why: 1 sentence with PM2.5 + wind/pressure + trend\n"
-                "• What to do: 1–2 practical steps\n"
-                "• Confidence: (0.xx) + sources + updated time\n"
-            )
-            template_kk = (
-                "Бүгінгі ұсыныс.\n"
-                "4 жол:\n"
-                "• Бүгін: қысқа шешім\n"
-                "• Себебі: PM2.5 + жел/қысым + тренд\n"
-                "• Ұсыныс: 1–2 қадам\n"
-                "• Сенім: (0.xx) + дереккөз + уақыт\n"
+            instructions = (
+                "Task: give personal recommendations for today.\n"
+                "Output format:\n"
+                "• 1 short summary sentence\n"
+                "• 4–7 bullet points, actionable (time windows, mask, ventilation, indoor exercise, medication reminder only if explicitly in profile)\n"
+                "• If air is Good/Moderate, still give light preventive tips.\n"
+                "Keep it short (max ~160 words)."
             )
 
-        user = {
-            "task": "Generate a safe recommendation card.",
-            "mode": mode,
-            "template": template_kk if lang == "kk" else template_ru,
-            "data": payload,
-        }
+        user = (
+            instructions
+            + "\n\nPayload (JSON):\n"
+            + json.dumps(payload, ensure_ascii=False, indent=2)
+        )
 
-        if not self.api_key:
-            # fallback without LLM
-            return self._fallback(payload, mode)
-
-        url = f"{self.base_url}/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
-        # OpenRouter optional headers
-        if self.site_url:
-            headers["HTTP-Referer"] = self.site_url
-        if self.app_name:
-            headers["X-Title"] = self.app_name
-
-        body = {
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": json.dumps(user, ensure_ascii=False)},
-            ],
-            "temperature": 0.2,
-        }
-
-        r = requests.post(url, headers=headers, json=body, timeout=30)
-        r.raise_for_status()
-        text = r.json()["choices"][0]["message"]["content"]
-        return _postcheck(text)
-
-    def _fallback(self, payload: dict, mode: str):
-        # deterministic safe text if LLM key missing
-        pm = payload.get("pm25_ug_m3")
-        conf = payload.get("confidence")
-        ts = payload.get("timestamp_local")
-        lang = payload.get("language", "ru")
-        if lang == "kk":
-            return f"• Бүгін: қауіп деңгейін төмендетіңіз.\n• Себебі: PM2.5={pm} µg/m³.\n• Ұсыныс: далада уақытты азайтыңыз, спортты үйде жасаңыз.\n• Сенім: {conf:.2f}. Дереккөз: OpenAQ+OpenWeather; {ts}."
-        return f"• Decision: reduce exposure today.\n• Why: PM2.5={pm} µg/m³.\n• What to do: spend less time outdoors; move sport indoors.\n• Confidence: {conf:.2f}. Source: OpenAQ+OpenWeather; updated {ts}."
+        return self._chat(
+            [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            temperature=0.35 if mode == "school" else 0.45,
+            max_tokens=420 if mode == "today" else 340,
+        )

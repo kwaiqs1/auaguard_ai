@@ -4,13 +4,13 @@
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
   <div class="lg:col-span-2 rounded-3xl glass p-4">
     <div class="flex items-center justify-between px-2 py-2">
-      <div class="font-semibold">{% if LANG_CODE=="kk" %}Карта{% else %}Map{% endif %}</div>
+      <div class="font-semibold">{% if LANG_CODE == "kk" %}Карта{% else %}Map{% endif %}</div>
       <div class="flex gap-2">
-        <input id="q" placeholder="{% if LANG_CODE=='kk' %}Адрес енгізу{% else %}Enter address{% endif %}"
+        <input id="q" placeholder="{% if LANG_CODE == 'kk' %}Адрес енгізу{% else %}Enter address{% endif %}"
                class="rounded-2xl bg-white/5 border border-white/10 px-4 py-2 w-72"/>
         <button onclick="search()"
                 class="rounded-2xl bg-white/5 border border-white/10 px-4 py-2 hover:bg-white/10">
-          {% if LANG_CODE=="kk" %}Іздеу{% else %}Search{% endif %}
+          {% if LANG_CODE == "kk" %}Іздеу{% else %}Search{% endif %}
         </button>
       </div>
     </div>
@@ -18,7 +18,7 @@
   </div>
 
   <div class="rounded-3xl glass p-6">
-    <div class="text-sm text-slate-300">{% if LANG_CODE=="kk" %}Таңдалған нүкте{% else %}Selected point{% endif %}</div>
+    <div class="text-sm text-slate-300">{% if LANG_CODE == "kk" %}Таңдалған нүкте{% else %}Selected point{% endif %}</div>
     <div id="meta" class="mt-2 text-sm">—</div>
 
     <div class="mt-4 grid grid-cols-2 gap-3">
@@ -31,7 +31,7 @@
         <div class="mt-1 text-xl font-semibold" id="aqi">—</div>
       </div>
       <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
-        <div class="text-xs text-slate-300">{% if LANG_CODE=="kk" %}Тәуекел{% else %}Risk{% endif %}</div>
+        <div class="text-xs text-slate-300">{% if LANG_CODE == "kk" %}Тәуекел{% else %}Risk{% endif %}</div>
         <div class="mt-1 text-xl font-semibold" id="risk">—</div>
       </div>
       <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
